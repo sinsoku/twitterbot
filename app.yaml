@@ -1,0 +1,13 @@
+application: sinsoku-twitterbot
+version: 1
+runtime: python
+api_version: 1
+
+handlers:
+- url: /
+  script: main.py
+- url: /(.*?)/view
+  script: /\1/main.py
+- url: /(.*?)/task
+  script: /\1/main.py
+  login: admin
