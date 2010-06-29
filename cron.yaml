@@ -1,5 +1,5 @@
 cron:
 - description: omiaibot post status every 10 minutes
   url: /omiaibot/task
-  schedule: every 1 hours
+  schedule: every 10 minutes
   timezone: Asia/Tokyo

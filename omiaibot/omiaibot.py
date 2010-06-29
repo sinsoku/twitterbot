@@ -18,13 +18,12 @@ class OmiaiBot(webapp.RequestHandler):
         searchwords=[u'彼女ほしい OR 彼氏ほしい']
         tweets = self.search(searchwords)
         tweets = self.filter(tweets)
-        self.saveTweets(tweets)
 
         self.response.headers['Content-Type'] = 'text/html'
         for tweet in tweets:
-            self.response.out.write('[' + tweet.from_user + '] ')
-            self.response.out.write(tweet.text + '<p>')
-            self.retweet(tweet)
+            self.response.out.write('RT @' + tweet.from_user + ': ' + tweet.text + '<p>')
+            self.post(tweet)
+            self.put(tweet)
 
     def search(self, words):
         ''' wordsの語句を一つずつ検索し、検索結果を一つのリストにして返す。
@@ -36,61 +35,54 @@ class OmiaiBot(webapp.RequestHandler):
         # 重複要素を消去したリストを返す
         return sorted(set(resultlist), key=resultlist.index)
 
-    def filter(self, status):
-        ''' statusから条件に合わないステータスを消去する。
-             * RT/QTしている人
-              * 同意してる人は消去しない
-              * 多段RT/QTは消去する
-             * リンク(http)がついてる人
+    def _isPosted(self, status):
+        ''' DBにstatusのidが保存されていたらTrue, 保存されていなければFalseを返す。
         '''
         query = Status.all()
-        query.order('-id')
-        db_latestobj = query.get()
-        removeIndex = []
+        query.filter('id =', status.id)
+        return query.count() > 0
 
-        # 一度postしたstatusは除去する
-        for i in xrange(len(status)):
-            # DBに保存（一度RT）されていたら除去する。
-            if db_latestobj != None and status[i].id <= db_latestobj.id:
-                removeIndex.append(i)
-            elif re.search('http://', status[i].text):
-                removeIndex.append(i)
-            # 多段RTで4回以上RTされていたら除去する
-            elif len(re.findall('(RT|QT)', status[i].text)) > 4:
-                removeIndex.append(i)
-            elif re.search('(RT|QT)', status[i].text) and re.search(u'(ほしい|欲しい)', status[i].text):
-                doui = re.search(u'(ほしい|欲しい)', status[i].text).span()
-                rtqt = re.search('(RT|QT)', status[i].text).span()
-                # "ほしい"がRT/QTの前に無ければRT/QTしない
-                if not doui < rtqt:
-                    removeIndex.append(i)
+    def _isAgree(self, text):
+        ''' text内の「彼女ほしい」に同意していればTrue, 同意していなければFalseを返す。
+        '''
+        doui = re.search(u'(ほしい|欲しい)', text)
+        rtqt = re.search('(RT|QT)', text)
+        return doui != None and rtqt != None and doui.span() < rtqt.span()
 
-            for j in xrange(len(status)):
-                if status[i].id != status[j].id and (not j in removeIndex) and status[j].text.endswith(status[i].text):
-                    removeIndex.append(i)
-
+    def filter(self, status):
+        ''' statusから条件に合わないステータスを消去する。
+             * 前回までのcronで既にpostしているステータス
+             * リンク(http)がついてるステータス
+             * 同意するpostがRT/QTの前にないステータス
+        '''
         filterdStatus = []
-        for i in xrange(len(status)):
-            if not i in removeIndex:
-                filterdStatus.append(status[i])
+
+        for s in status:
+            if (not self._isPosted(s)) and (not re.search('http://', s.text)) and self._isAgree(s.text):
+                filterdStatus.append(s)
 
         return filterdStatus
 
-    def retweet(self, status):
-        cnv_status = re.sub('@', ':', status.text)
-        self.api.update_status(cnv_status)
-
-    def saveTweets(self, status):
-        ''' ReTweetするstatusをデータストアに保存する
+    def post(self, status):
+        ''' @userを_userに置換し、リプライが飛ばないように修正してからpostする。また、160字を超えていた場合はpostしない。
         '''
-        for tweet in status:
-            s = Status()
-            s.id = tweet.id
-            s.user = tweet.from_user
-            s.text = tweet.text
-            s.put()
+        text = 'RT @' + status.from_user + ': ' + status.text
+        cnv_status = re.sub('@', '_', text)
+        if len(cnv_status) < 160:
+            self.api.update_status(cnv_status)
+
+    def put(self, status):
+        ''' postするstatusをデータストアに保存する
+        '''
+        s = Status()
+        s.id = status.id
+        s.user = status.from_user
+        s.text = status.text
+        s.put()
 
     def authTwitter(self):
+        ''' Twitterの認証を行い、tweepy.APIを返す。
+        '''
         ckey = ''
         csec = ''
         akey = ''
