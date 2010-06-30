@@ -15,7 +15,7 @@ class OmiaiBot(webapp.RequestHandler):
     def get(self):
         self.api = self.authTwitter()
         
-        searchwords=[u'彼女ほしい OR 彼氏ほしい']
+        searchwords=[u'彼女ほしい OR 彼氏ほしい OR 彼女欲しい OR 彼氏欲しい']
         tweets = self.search(searchwords)
         tweets = self.filter(tweets)
 
@@ -58,7 +58,7 @@ class OmiaiBot(webapp.RequestHandler):
         filterdStatus = []
 
         for s in status:
-            if (not self._isPosted(s)) and (not re.search('http://', s.text)) and self._isAgree(s.text):
+            if (not self._isPosted(s)) and (not re.search('http://', s.text)) and (not re.search('(RT|QT)', s.text) or self._isAgree(s.text)):
                 filterdStatus.append(s)
 
         return filterdStatus
