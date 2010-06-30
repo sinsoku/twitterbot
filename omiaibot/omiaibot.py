@@ -64,11 +64,11 @@ class OmiaiBot(webapp.RequestHandler):
         return filterdStatus
 
     def post(self, status):
-        ''' @userを_userに置換し、リプライが飛ばないように修正してからpostする。また、160字を超えていた場合はpostしない。
+        ''' @userを_userに置換し、リプライが飛ばないように修正してからpostする。また、140字を超えていた場合はpostしない。
         '''
         text = 'RT @' + status.from_user + ': ' + status.text
         cnv_status = re.sub('@', '_', text)
-        if len(cnv_status) < 160:
+        if len(cnv_status) < 140:
             self.api.update_status(cnv_status)
 
     def put(self, status):
