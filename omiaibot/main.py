@@ -8,11 +8,13 @@ class MainHandler(webapp.RequestHandler):
     def get(self):
         self.response.out.write('Hello, World')
 
+def application():
+    return webapp.WSGIApplication([('/omiaibot/', MainHandler),
+                                   ('/omiaibot/task', OmiaiBot)],
+                                   debug=True)
+
 def main():
-    application = webapp.WSGIApplication([('/omiaibot/', MainHandler),
-                                          ('/omiaibot/task', OmiaiBot)],
-                                         debug=True)
-    util.run_wsgi_app(application)
+    util.run_wsgi_app(application())
 
 
 if __name__ == '__main__':
